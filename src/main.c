@@ -4,6 +4,8 @@
 int main(void){
     char func[] = "AcquireSRWLockExclusive";
     HMODULE _kernel32 = LoadLibrary((LPCWSTR)"kernel32.dll");
-    printf("__get_proc_address: %x\n", __get_proc_address(_kernel32, "AcquireSRWLockExclusive"));
-    printf("GetProcAddress:  %x\n", GetProcAddress(_kernel32, "AcquireSRWLockExclusive"));
+
+    assert(__get_proc_address(_kernel32, "AcquireSRWLockExclusive"), GetProcAddress(_kernel32, "AcquireSRWLockExclusive"));
+    
+    return 0;
 }
