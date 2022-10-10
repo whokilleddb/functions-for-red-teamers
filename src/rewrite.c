@@ -2,19 +2,11 @@
 /// References: https://wiki.osdev.org/PE
 #include "rewrite.h"
 
+/// Rewriting WinAPI functions so DLLs can duck off
+/// References: https://wiki.osdev.org/PE
+#include "rewrite.h"
 typedef HMODULE (WINAPI * LoadLibrary_t)(LPCSTR lpFileName);
-LoadLibrary_t pLoadLibraryA = NULL;
-
-// Rewrite of GetModuleHandlesA:
-// Retrieves a module handle for the specified module. The module must have been loaded by the calling process.
-// https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-getmodulehandlea
-HMODULE WINAPI __get_module_handle(LPCSTR lpModuleName){
-    HMODULE retval;
-
-    return retval;
-}
-
-
+extern LoadLibrary_t pLoadLibraryA = NULL;
 /// Rewrite of GetProcAddress
 ///
 /// Retrieves the address of an exported function (also known as a procedure)
@@ -106,7 +98,7 @@ FARPROC WINAPI __get_proc_address(HMODULE hModule, LPCSTR  lpProcName){
 
             // resolve LoadLibrary function pointer, keep it as global variable
             if (!pLoadLibraryA) {
-                pLoadLibraryA= (LoadLibrary_t)__get_proc_address(GetModuleHandle((LPCWSTR)"kernel32.dll"), "LoadLibraryA");
+                pLoadLibraryA= (LoadLibrary_t)__get_proc_address(GetModuleHandle((LPCSTR)"kernel32.dll"), "LoadLibraryA");
                 if (pLoadLibraryA == NULL) {
                     free(__fwd_dll);
                     return NULL;
@@ -134,7 +126,3 @@ FARPROC WINAPI __get_proc_address(HMODULE hModule, LPCSTR  lpProcName){
     #endif
     return (FARPROC) retaddr;
 }
-
-
-
-
