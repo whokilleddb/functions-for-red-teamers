@@ -4,8 +4,11 @@ CC := cl
 # linker
 LK := link
 
+# Output
+OUTEXE := poc.exe
+
 # Compiler Flags
-CFLAGS :=  /nologo /Ox /MT /W0 /GS- /DNDEBUG
+CFLAGS :=  /nologo /Ox /MT /W0 /GS- 
 
 # Linker Flags
 LFLAGS := /SUBSYSTEM:CONSOLE /MACHINE:x64 
@@ -20,4 +23,4 @@ rewrite: $(SRCDIR)/rewrite.c $(SRCDIR)/rewrite.h
 
 main: rewrite.obj
 	$(CC) $(CFLAGS) /c /I$(SRCDIR) $(SRCDIR)/main.c
-	$(LK) rewrite.obj main.obj /OUT:poc.exe
+	$(LK) rewrite.obj main.obj /OUT:$(OUTEXE)
