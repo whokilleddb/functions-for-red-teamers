@@ -24,3 +24,4 @@ rewrite: $(SRCDIR)/rewrite.c $(SRCDIR)/rewrite.h
 main: rewrite.obj
 	$(CC) $(CFLAGS) /c /I$(SRCDIR) $(SRCDIR)/main.c
 	$(LK) rewrite.obj main.obj /OUT:$(OUTEXE)
+	@del /Q *.obj
