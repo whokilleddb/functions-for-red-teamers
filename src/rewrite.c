@@ -1,12 +1,65 @@
-/// Rewriting WinAPI functions so DLLs can duck off
+/// Rewriting WinAPI functions
 /// References: https://wiki.osdev.org/PE
 #include "rewrite.h"
 
-/// Rewriting WinAPI functions so DLLs can duck off
-/// References: https://wiki.osdev.org/PE
-#include "rewrite.h"
 typedef HMODULE (WINAPI * LoadLibrary_t)(LPCSTR lpFileName);
 extern LoadLibrary_t pLoadLibraryA = NULL;
+
+HMODULE WINAPI __get_module_handle(LPCWSTR lpModuleName){    
+    // get the offset of Process Environment Block
+    #ifdef _M_IX86 
+        PEB * peb_blk = (PEB *) __readfsdword(0x30);    // for 32 bit, the address of PEB is stored at an offset of 0x30 in the fs register
+    #else
+        PEB * peb_blk = (PEB *) __readgsqword(0x60);     // for 64 bit, the address of PEB is stored at an offset of 0x60 in the gs register
+    #endif
+
+    #ifdef VERBOSE
+        if(lpModuleName) 
+            printf("[i] %ls\n", lpModuleName);
+        else
+            printf("[i] Self Process\n");
+        printf("0x%08x\t Process Environment Block\n");
+    #endif
+
+
+    // From MSDN: 
+    // If this parameter is NULL, GetModuleHandle returns a handle to the file used to create the calling process (.exe file).
+    if(NULL == lpModuleName)
+        return (HMODULE) (peb_blk->ImageBaseAddress);
+
+    PEB_LDR_DATA * __ldr = peb_blk->Ldr;
+    LIST_ENTRY * __in_memory_order_module_list = &__ldr->InMemoryOrderModuleList; // Address of Beginning of Doubly Linked List
+    LIST_ENTRY * __start_list_entry = __in_memory_order_module_list->Flink;
+
+    #ifdef VERBOSE
+        printf("0x%x\t Address of Loader\n", __ldr);
+        printf("0x%x\t Address of InMemoryOrderModuleList\n", __in_memory_order_module_list);
+    #endif
+
+    // Iterate through Doubly Linked List
+    for(LIST_ENTRY * _cell = __start_list_entry;                    // Initial Cell of InMemoryOrderModuleList
+                     _cell != __in_memory_order_module_list;        // Iterate over all values of the Doubly Linked List
+                     _cell = _cell->Flink){
+        
+        // Get Current Data Table Entry
+        LDR_DATA_TABLE_ENTRY * _entry = (LDR_DATA_TABLE_ENTRY *) ((BYTE *)_cell - sizeof(LIST_ENTRY)); 
+
+        // Check for same name
+        if (lstrcmpiW(lpModuleName, _entry->BaseDllName.Buffer) == 0){
+            #ifdef VERBOSE
+                printf("0x%x\t Address of Entry\n", _entry);
+            #endif
+
+            return (HMODULE) _entry->DllBase;   
+        }
+    }
+    #ifdef VERBOSE
+        printf("Could not find address for %ls\n", lpModuleName);
+    #endif
+    return NULL;
+}
+
+
 /// Rewrite of GetProcAddress
 ///
 /// Retrieves the address of an exported function (also known as a procedure)
@@ -58,7 +111,6 @@ FARPROC WINAPI __get_proc_address(HMODULE hModule, LPCSTR  lpProcName){
         
         for (DWORD i = 0; i < export_dir_addr->NumberOfNames; i++) {
             char * __temp_name = (char *)base_addr + (DWORD_PTR) addr_func_name_tbl[i];
-            
             if (strcmp(lpProcName, __temp_name) == 0) {
                 retaddr = (FARPROC)(base_addr + (DWORD_PTR)addr_eat[addr_ord_tbl[i]]);
                 break;
