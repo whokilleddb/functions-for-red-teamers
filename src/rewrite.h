@@ -72,5 +72,5 @@ typedef struct _PEB {
 } PEB;
   
   
-extern HMODULE WINAPI __get_module_handle(LPCWSTR lpModuleName);
+extern HMODULE WINAPI __get_module_handle(LPCSTR lpModuleName);
 extern FARPROC WINAPI __get_proc_address(HMODULE hModule, LPCSTR  lpProcName);

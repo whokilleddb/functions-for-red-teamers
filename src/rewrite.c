@@ -5,7 +5,10 @@
 typedef HMODULE (WINAPI * LoadLibrary_t)(LPCSTR lpFileName);
 extern LoadLibrary_t pLoadLibraryA = NULL;
 
-HMODULE WINAPI __get_module_handle(LPCWSTR lpModuleName){    
+HMODULE WINAPI __get_module_handle(LPCSTR lpModuleName){   
+    wchar_t __lib_nameW[MAX_PATH];
+    MultiByteToWideChar(CP_ACP, 0, lpModuleName, -1, __lib_nameW, MAX_PATH); 
+
     // get the offset of Process Environment Block
     #ifdef _M_IX86 
         PEB * peb_blk = (PEB *) __readfsdword(0x30);    // for 32 bit, the address of PEB is stored at an offset of 0x30 in the fs register
@@ -15,9 +18,9 @@ HMODULE WINAPI __get_module_handle(LPCWSTR lpModuleName){
 
     #ifdef VERBOSE
         if(lpModuleName) 
-            printf("[i] %ls\n", lpModuleName);
+            printf("\n[i] %s\n", lpModuleName);
         else
-            printf("[i] Self Process\n");
+            printf("\n[i] Self Process\n");
         printf("0x%08x\t Process Environment Block\n");
     #endif
 
@@ -26,7 +29,7 @@ HMODULE WINAPI __get_module_handle(LPCWSTR lpModuleName){
     // If this parameter is NULL, GetModuleHandle returns a handle to the file used to create the calling process (.exe file).
     if(NULL == lpModuleName)
         return (HMODULE) (peb_blk->ImageBaseAddress);
-
+    
     PEB_LDR_DATA * __ldr = peb_blk->Ldr;
     LIST_ENTRY * __in_memory_order_module_list = &__ldr->InMemoryOrderModuleList; // Address of Beginning of Doubly Linked List
     LIST_ENTRY * __start_list_entry = __in_memory_order_module_list->Flink;
@@ -43,11 +46,10 @@ HMODULE WINAPI __get_module_handle(LPCWSTR lpModuleName){
         
         // Get Current Data Table Entry
         LDR_DATA_TABLE_ENTRY * _entry = (LDR_DATA_TABLE_ENTRY *) ((BYTE *)_cell - sizeof(LIST_ENTRY)); 
-
-        // Check for same name
-        if (lstrcmpiW(lpModuleName, _entry->BaseDllName.Buffer) == 0){
+        
+        if (lstrcmpiW(__lib_nameW, _entry->BaseDllName.Buffer) == 0){
             #ifdef VERBOSE
-                printf("0x%x\t Address of Entry\n", _entry);
+                printf("0x%x\t Address of DLLBase\n", _entry->DllBase);
             #endif
 
             return (HMODULE) _entry->DllBase;   
@@ -56,6 +58,7 @@ HMODULE WINAPI __get_module_handle(LPCWSTR lpModuleName){
     #ifdef VERBOSE
         printf("Could not find address for %ls\n", lpModuleName);
     #endif
+
     return NULL;
 }
 
@@ -150,7 +153,13 @@ FARPROC WINAPI __get_proc_address(HMODULE hModule, LPCSTR  lpProcName){
 
             // resolve LoadLibrary function pointer, keep it as global variable
             if (!pLoadLibraryA) {
-                pLoadLibraryA= (LoadLibrary_t)__get_proc_address(GetModuleHandle((LPCSTR)"kernel32.dll"), "LoadLibraryA");
+                HMODULE __handle = __get_module_handle((LPCSTR)"kernel32.dll");
+                if (NULL == __handle) {
+                    free(__fwd_dll);
+                    return NULL;
+                }
+
+                pLoadLibraryA= (LoadLibrary_t)__get_proc_address( __handle, "LoadLibraryA");
                 if (pLoadLibraryA == NULL) {
                     free(__fwd_dll);
                     return NULL;
